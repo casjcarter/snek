@@ -54,8 +54,8 @@ void stop_ncurses() {
 
 /* helper functions */
 
-bool is_some_char(int y, int x, char c) {
-	if (mvinch(y, x) == c) {
+bool is_some_char(WINDOW* win, int y, int x, wchar_t c) {
+	if (mvwinch(win, y, x) == c) {
 		return true;
 	}
 	return false;
@@ -66,6 +66,20 @@ int* push(int* arr, int size, int value) {
 	for (int i = size; i >= 0; i--) arr[i+1] = arr[i];
 	arr[0] = value;
 	return arr;
+}
+
+/* handling ncurses screens */
+
+WINDOW* init_win(int h, int w, int y, int x) {
+	WINDOW* win = newwin(h, w, y, x);
+	wrefresh(win);
+	return win;
+}
+
+WINDOW* kill_win(WINDOW* win) {
+	wborder(win, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
+	wrefresh(win);
+	delwin(win);
 }
 
 /* player related functions */
@@ -82,19 +96,21 @@ void init_player(struct Player* pl) {
 	pl -> snak_exists = false;
 }
 
-bool is_walkable(int y, int x) {
-	if (is_some_char(y, x, WALL_CHAR) || is_some_char(y, x, SNEK_TAIL)) {
+bool is_walkable(WINDOW* win, int y, int x) {
+	if (is_some_char(win, y, x, SNEK_TAIL) 
+			|| is_some_char(win, y, x, mvwinch(win, 0, 1))
+			|| is_some_char(win, y, x, mvwinch(win, 1, 0))) {
 		return false;
 	} else {
 		return true;
 	}
 }
 
-void move_player(struct Player* pl) {
+void move_player(WINDOW* win, struct Player* pl) {
 	/* Moves head, and pushes last location onto tail */
 	int to_y = pl -> locy + pl -> diry;
 	int to_x = pl -> locx + pl -> dirx;
-	if (is_walkable(to_y, to_x)) {
+	if (is_walkable(win, to_y, to_x)) {
 		pl -> taily = push(pl -> taily, pl -> score + 1, pl -> locy);
 		pl -> tailx = push(pl -> tailx, pl -> score + 1, pl -> locx);
 		pl -> locy = to_y;
@@ -104,12 +120,12 @@ void move_player(struct Player* pl) {
 	}
 }
 
-void draw_player(struct Player* pl) {
+void draw_player(WINDOW* win, struct Player* pl) {
 	for (int i = 0; i < pl -> score + 1; i++) {
 		if (pl -> taily[i] != 0 && pl -> tailx[i] != 0)
-			mvaddch(pl -> taily[i], pl -> tailx[i], SNEK_TAIL);
+			mvwaddch(win, pl -> taily[i], pl -> tailx[i], SNEK_TAIL);
 	}
-	mvaddch(pl -> locy, pl -> locx, SNEK_HEAD);
+	mvwaddch(win, pl -> locy, pl -> locx, SNEK_HEAD);
 }
 
 void grow_player(struct Player* pl) {
@@ -118,26 +134,24 @@ void grow_player(struct Player* pl) {
 
 /* snak related functions */
 
-void init_snak(struct Snak* sn) {
+void init_snak(WINDOW* win, struct Snak* sn) {
 	/* Picks a random location to place a snak */
 	int y;
 	int x;
 	do {
 		y = (rand() % LEVEL_H) + 1;
 		x = (rand() % LEVEL_W) + 1;
-	} while (!is_some_char(y, x, FLOOR_CHAR));
-	mvaddch(y, x, SNAK_CHAR);
+	} while (!is_some_char(win, y, x, FLOOR_CHAR));
+	mvwaddch(win, y, x, SNAK_CHAR);
 	sn -> locy = y;
 	sn -> locx = x;
 	sn -> exists = true;
 }
 
-void draw_snak(struct Snak* sn) {
-	mvaddch(sn -> locy, sn -> locx, SNAK_CHAR);
+void draw_snak(WINDOW* win, struct Snak* sn) {
+	mvwaddch(win, sn -> locy, sn -> locx, SNAK_CHAR);
 }
 
-// TODO: Add a collect_snak function that increases the player's score
-// and size, as well as setting sn -> exists = false; 
 void collect_snak(struct Player* pl, struct Snak* sn) {
 	if (pl -> locy == sn -> locy && pl -> locx == sn -> locx) {
 		sn -> exists = false;
@@ -146,26 +160,15 @@ void collect_snak(struct Player* pl, struct Snak* sn) {
 }
 
 /* draw the scoreboard */
-void draw_score(struct Player* pl) {
-	mvprintw(LEVEL_H + 2, 1, "Score: %d", pl -> score);
-}
-
-/* draw the level */
-
-void draw_level() {
-	/* draws the walls and floor */
-	for (int y = 0; y <= LEVEL_H; y++) {
-		mvhline(y, 1, FLOOR_CHAR, LEVEL_W);
-  }
-	mvhline(0, 0, WALL_CHAR, LEVEL_W+2);
-	mvhline(LEVEL_H+1, 0, WALL_CHAR, LEVEL_W+2);
-	mvvline(0, 0, WALL_CHAR, LEVEL_H+2);
-	mvvline(0, LEVEL_W+1, WALL_CHAR, LEVEL_H+2);
+void draw_score(WINDOW* win, struct Player* pl) {
+	mvwprintw(win, 1, 2, "snaks: %d", pl -> score);
 }
 
 /* where all the stuff happens */
 
 void game_loop() {
+	WINDOW* game_win = init_win(LEVEL_H+2, LEVEL_W+2, 0, 0);
+	WINDOW* score_win = init_win(3, 14, LEVEL_H+2, 0);
 	struct Player* pl = &player;
 	struct Snak* sn = &snak;
 	init_player(pl);
@@ -191,22 +194,31 @@ void game_loop() {
 				pl -> dirx = 1;
 				break;
 		}
-		move_player(pl);
+		werase(game_win);
+
+		box(game_win, 0, 0);
+		box(score_win, 0, 0);
+		draw_snak(game_win, sn);
+		draw_player(game_win, pl);
+		draw_score(score_win, pl);
+
+		wrefresh(game_win);
+		wrefresh(score_win);
+
+		move_player(game_win, pl);
 		if (!(pl -> alive)) break;
-		if (!(sn -> exists)) init_snak(sn);
+		if (!(sn -> exists)) init_snak(game_win, sn);
 		collect_snak(pl, sn);
 
-		draw_level();
-		draw_snak(sn);
-		draw_player(pl);
-		draw_score(pl);
-		
-		refresh();
 		napms(1000/FRAME_RATE);
 	}
 	/* free player tail memory */
 	free(pl -> taily);
 	free(pl -> tailx);
+
+	/* kill windows */
+	kill_win(game_win);
+	kill_win(score_win);
 }
 
 int main(void) {
