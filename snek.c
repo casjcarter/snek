@@ -6,7 +6,6 @@
 #define SNEK_HEAD 'S'
 #define SNEK_TAIL 's'
 #define SNAK_CHAR '@'
-#define WALL_CHAR '#'
 #define FLOOR_CHAR ' '
 
 #define FRAME_RATE 6
@@ -37,9 +36,9 @@ struct Snak {
 /* start, run, and end program */
 
 void start_ncurses() {
-  initscr();
-  cbreak();
-  noecho();
+  	initscr();
+  	cbreak();
+  	noecho();
 	nodelay(stdscr, true);
 	curs_set(false);
 }
@@ -47,14 +46,14 @@ void start_ncurses() {
 void stop_ncurses() {
 	curs_set(true);
 	nodelay(stdscr, false);
-  echo();
-  nocbreak();
-  endwin();
+  	echo();
+  	nocbreak();
+  	endwin();
 }
 
 /* helper functions */
 
-bool is_some_char(WINDOW* win, int y, int x, wchar_t c) {
+bool is_some_char(WINDOW* win, int y, int x, char c) {
 	if (mvwinch(win, y, x) == c) {
 		return true;
 	}
@@ -63,7 +62,8 @@ bool is_some_char(WINDOW* win, int y, int x, wchar_t c) {
 
 int* push(int* arr, int size, int value) {
 	/* puts value in index 0 of arr, pushing all other values right */
-	for (int i = size; i >= 0; i--) arr[i+1] = arr[i];
+	// for (int i = size; i >= 0; i--) arr[i+1] = arr[i];
+	for (int i = size; i >= 0; i--) *(arr+i+1) = *(arr+i);
 	arr[0] = value;
 	return arr;
 }
@@ -98,8 +98,8 @@ void init_player(struct Player* pl) {
 
 bool is_walkable(WINDOW* win, int y, int x) {
 	if (is_some_char(win, y, x, SNEK_TAIL) 
-			|| is_some_char(win, y, x, mvwinch(win, 0, 1))
-			|| is_some_char(win, y, x, mvwinch(win, 1, 0))) {
+		|| is_some_char(win, y, x, mvwinch(win, 0, 1))
+		|| is_some_char(win, y, x, mvwinch(win, 1, 0))) {
 		return false;
 	} else {
 		return true;
@@ -161,20 +161,32 @@ void collect_snak(struct Player* pl, struct Snak* sn) {
 
 /* draw the scoreboard */
 void draw_score(WINDOW* win, struct Player* pl) {
-	mvwprintw(win, 1, 2, "snaks: %d", pl -> score);
+	mvwprintw(win, 1, 2, "%d", pl -> score);
+}
+
+/* draw game over screen */
+void game_over() {
+	WINDOW* game_over_win = init_win(3,13,LEVEL_H/2-1, LEVEL_W/2-6);
+	box(game_over_win, 0, 0);
+	mvwaddstr(game_over_win, 1, 2, "GAME OVER");
+	wrefresh(game_over_win);
+	nodelay(stdscr, false);
+	napms(1000);
+	char ch = getch();
 }
 
 /* where all the stuff happens */
 
 void game_loop() {
 	WINDOW* game_win = init_win(LEVEL_H+2, LEVEL_W+2, 0, 0);
-	WINDOW* score_win = init_win(3, 14, LEVEL_H+2, 0);
+	WINDOW* score_win = init_win(3, 7, LEVEL_H+2, 0);
 	struct Player* pl = &player;
 	struct Snak* sn = &snak;
 	init_player(pl);
+	char ch;
 	while (true) {
 		/* check player input */
-		char ch = getch();
+		ch = getch();
 		if (ch == 'q') break;
 		switch(ch) {
 			case 'w':
@@ -196,7 +208,7 @@ void game_loop() {
 		}
 		werase(game_win);
 
-		box(game_win, 0, 0);
+		wborder(game_win, '#', '#', '#', '#', '#', '#', '#', '#');
 		box(score_win, 0, 0);
 		draw_snak(game_win, sn);
 		draw_player(game_win, pl);
@@ -210,11 +222,15 @@ void game_loop() {
 		if (!(sn -> exists)) init_snak(game_win, sn);
 		collect_snak(pl, sn);
 
+
 		napms(1000/FRAME_RATE);
 	}
 	/* free player tail memory */
 	free(pl -> taily);
 	free(pl -> tailx);
+
+	/* show game over screen */
+	game_over();
 
 	/* kill windows */
 	kill_win(game_win);
@@ -222,7 +238,7 @@ void game_loop() {
 }
 
 int main(void) {
-  start_ncurses();
+  	start_ncurses();
 	game_loop();
-  stop_ncurses();
+  	stop_ncurses();
 }
