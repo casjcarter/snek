@@ -25,13 +25,13 @@ struct Player {
 	int* tailx;
 	int score;
 	bool snak_exists;
-} player;
+};
 
 struct Snak {
 	int locy;
 	int locx;
 	bool exists; 
-} snak;
+};
 
 /* start, run, and end program */
 
@@ -62,7 +62,6 @@ bool is_some_char(WINDOW* win, int y, int x, char c) {
 
 int* push(int* arr, int size, int value) {
 	/* puts value in index 0 of arr, pushing all other values right */
-	// for (int i = size; i >= 0; i--) arr[i+1] = arr[i];
 	for (int i = size-2; i >= 0; i--) *(arr+i+1) = *(arr+i);
 	arr[0] = value;
 	return arr;
@@ -84,7 +83,8 @@ WINDOW* kill_win(WINDOW* win) {
 
 /* player related functions */
 
-void init_player(struct Player* pl) {
+struct Player* init_player() {
+	struct Player* pl = (struct Player*)malloc(sizeof(struct Player));
 	pl -> locy = 1;
 	pl -> locx = 1;
 	pl -> diry = 0;
@@ -94,6 +94,7 @@ void init_player(struct Player* pl) {
 	pl -> tailx = (int*)calloc(2, sizeof(int));
 	pl -> score = 0;
 	pl -> snak_exists = false;
+	return pl;
 }
 
 bool is_walkable(WINDOW* win, int y, int x) {
@@ -136,8 +137,9 @@ void grow_player(struct Player* pl) {
 
 /* snak related functions */
 
-void init_snak(WINDOW* win, struct Snak* sn) {
+struct Snak* init_snak(WINDOW* win) {
 	/* Picks a random location to place a snak */
+	struct Snak* sn = (struct Snak*)malloc(sizeof(struct Snak));
 	int y;
 	int x;
 	do {
@@ -148,6 +150,7 @@ void init_snak(WINDOW* win, struct Snak* sn) {
 	sn -> locy = y;
 	sn -> locx = x;
 	sn -> exists = true;
+	return sn;
 }
 
 void draw_snak(WINDOW* win, struct Snak* sn) {
@@ -158,6 +161,7 @@ void collect_snak(struct Player* pl, struct Snak* sn) {
 	if (pl -> locy == sn -> locy && pl -> locx == sn -> locx) {
 		sn -> exists = false;
 		grow_player(pl);
+		free(sn);
 	}
 }
 
@@ -182,9 +186,8 @@ void game_over() {
 void game_loop() {
 	WINDOW* game_win = init_win(LEVEL_H+2, LEVEL_W+2, 0, 0);
 	WINDOW* score_win = init_win(3, 7, LEVEL_H+2, 0);
-	struct Player* pl = &player;
-	struct Snak* sn = &snak;
-	init_player(pl);
+	struct Player* pl = init_player();
+	struct Snak* sn = init_snak(game_win);
 	char ch;
 	while (true) {
 		/* check player input */
@@ -221,15 +224,16 @@ void game_loop() {
 
 		move_player(game_win, pl);
 		if (!(pl -> alive)) break;
-		if (!(sn -> exists)) init_snak(game_win, sn);
+		if (!(sn -> exists)) sn = init_snak(game_win);
 		collect_snak(pl, sn);
-
 
 		napms(1000/FRAME_RATE);
 	}
 	/* free player tail memory */
 	free(pl -> taily);
 	free(pl -> tailx);
+	free(pl);
+	pl = NULL;
 
 	/* show game over screen */
 	game_over();
