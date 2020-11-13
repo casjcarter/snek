@@ -3,6 +3,6 @@
 A game like Snake, but worse.
 
 ## __TODO__:
-- [ ] Win and lose states with their own screens
-- [ ] Tweak snake and wall characters
+- [X] Game over screen
+- [ ] Draw snake using box-drawing characters.
 - [ ] Think of more things to add
