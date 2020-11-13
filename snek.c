@@ -63,7 +63,7 @@ bool is_some_char(WINDOW* win, int y, int x, char c) {
 int* push(int* arr, int size, int value) {
 	/* puts value in index 0 of arr, pushing all other values right */
 	// for (int i = size; i >= 0; i--) arr[i+1] = arr[i];
-	for (int i = size; i >= 0; i--) *(arr+i+1) = *(arr+i);
+	for (int i = size-2; i >= 0; i--) *(arr+i+1) = *(arr+i);
 	arr[0] = value;
 	return arr;
 }
@@ -90,8 +90,8 @@ void init_player(struct Player* pl) {
 	pl -> diry = 0;
 	pl -> dirx = 0;
 	pl -> alive = true;
-	pl -> taily = (int*)calloc(LEVEL_H*LEVEL_W, sizeof(int));
-	pl -> tailx = (int*)calloc(LEVEL_H*LEVEL_W, sizeof(int));
+	pl -> taily = (int*)calloc(2, sizeof(int));
+	pl -> tailx = (int*)calloc(2, sizeof(int));
 	pl -> score = 0;
 	pl -> snak_exists = false;
 }
@@ -130,6 +130,8 @@ void draw_player(WINDOW* win, struct Player* pl) {
 
 void grow_player(struct Player* pl) {
 	pl -> score++;
+	pl -> taily  = realloc(pl -> taily, (1 + pl -> score)*sizeof(int));
+	pl -> tailx  = realloc(pl -> tailx, (1 + pl -> score)*sizeof(int));
 }
 
 /* snak related functions */
@@ -171,7 +173,7 @@ void game_over() {
 	mvwaddstr(game_over_win, 1, 2, "GAME OVER");
 	wrefresh(game_over_win);
 	nodelay(stdscr, false);
-	napms(1000);
+	napms(500);
 	char ch = getch();
 }
 
