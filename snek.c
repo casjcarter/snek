@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ncurses.h>
+#include <unistd.h>
 
 #define SNEK_HEAD 'S'
 #define SNEK_TAIL 's'
@@ -167,9 +168,39 @@ void collect_snak(struct Player* pl, struct Snak* sn) {
 	}
 }
 
+/* hi score realted functions */
+int read_hiscore() {
+	int score;
+	char* fname = "hiscore";
+	FILE* f;
+	if (f = fopen(fname, "r")) {
+		/* if the file exists */
+		fscanf(f, "%d", &score);
+		fclose(f);
+	} else {
+		/* if not, it'll be created in write_hiscore() */
+		score = 0;
+	}
+
+	return score; 
+}
+
+void write_hiscore(struct Player* pl) {
+	int hiscore = read_hiscore();
+	if (hiscore < pl -> score) {
+		FILE* f = fopen("hiscore", "w");
+		fprintf(f, "%d\n", pl -> score);
+		fclose(f);
+	}
+}
+
 /* draw the scoreboard */
 void draw_score(WINDOW* win, struct Player* pl) {
 	mvwprintw(win, 1, 2, "%d", pl -> score);
+}
+
+void draw_hiscore(WINDOW* win) {
+	mvwprintw(win, 1, 2, "hi-score: %d", read_hiscore());
 }
 
 /* draw game over screen */
@@ -188,9 +219,12 @@ void game_over() {
 void game_loop() {
 	WINDOW* game_win = init_win(LEVEL_H+2, LEVEL_W+2, 0, 0);
 	WINDOW* score_win = init_win(3, 7, LEVEL_H+2, 0);
+	WINDOW* hiscore_win = init_win(3, 17, LEVEL_H+2, 7);
 
 	struct Player* pl = init_player();
 	struct Snak* sn = init_snak(game_win);
+
+	draw_hiscore(hiscore_win);
 
 	char ch;
 
@@ -217,16 +251,21 @@ void game_loop() {
 
 		wborder(game_win, '#', '#', '#', '#', '#', '#', '#', '#');
 		box(score_win, 0, 0);
+		box(hiscore_win, 0, 0);
 		draw_snak(game_win, sn);
 		draw_player(game_win, pl);
 		draw_score(score_win, pl);
 
 		wrefresh(game_win);
 		wrefresh(score_win);
+		wrefresh(hiscore_win);
 
 		move_player(game_win, pl);
 
-		if (!(pl -> alive)) break;
+		if (!(pl -> alive)) {
+			write_hiscore(pl);
+			break;
+		}
 		if (!(sn -> exists)) sn = init_snak(game_win);
 
 		collect_snak(pl, sn);
@@ -244,6 +283,7 @@ void game_loop() {
 	/* kill windows */
 	kill_win(game_win);
 	kill_win(score_win);
+	kill_win(hiscore_win);
 }
 
 int main(void) {
