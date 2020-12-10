@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ncurses.h>
-#include <unistd.h>
 
 #define SNEK_HEAD 'S'
 #define SNEK_TAIL 's'
